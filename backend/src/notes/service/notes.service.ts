@@ -11,10 +11,10 @@ export class NotesService {
   private readonly redis: Redis;
 
   constructor(private prisma: PrismaService) {
-    // this.redis = new Redis({
-    //   host: process.env.REDIS_HOST,
-    //   port: parseInt(process.env.REDIS_PORT ? process.env.REDIS_PORT : '6379'),
-    // });
+    this.redis = new Redis({
+      host: process.env.REDIS_HOST,
+      port: parseInt(process.env.REDIS_PORT ? process.env.REDIS_PORT : '6379'),
+    });
   }
 
   async create(createNoteDto: CreateNoteDto, userId: number): Promise<any> {
@@ -32,7 +32,7 @@ export class NotesService {
       },
     });
 
-    // await this.invalidateCacheForUser(userId);
+    await this.invalidateCacheForUser(userId);
 
     return note;
   }
@@ -60,37 +60,37 @@ export class NotesService {
       where: { id },
       data: { ...updateNoteDto, updatedAt: new Date() },
     });
-    // await this.invalidateCacheForUser(userId);
+    await this.invalidateCacheForUser(userId);
     return updated;
   }
 
   async remove(id: number, userId: number): Promise<void> {
     await this.findOne(id, userId);
     await this.prisma.note.delete({ where: { id } });
-    // await this.invalidateCacheForUser(userId);
+    await this.invalidateCacheForUser(userId);
   }
 
-  // async search(userId: number, searchDto: SearchNotesDto): Promise<Note[]> {
-  //   const cacheKey = `notes:search:${userId}:${JSON.stringify(searchDto.tags || [])}`;
-  //   let redisCached = await this.redis.get(cacheKey);
-  //   if (redisCached) {
-  //     return JSON.parse(redisCached);
-  //   }
+  async search(userId: number, searchDto: SearchNotesDto): Promise<Note[]> {
+    const cacheKey = `notes:search:${userId}:${JSON.stringify(searchDto.tags || [])}`;
+    let redisCached = await this.redis.get(cacheKey);
+    if (redisCached) {
+      return JSON.parse(redisCached);
+    }
 
-  //   const where: any = { userId };
-  //   if (searchDto.tags && searchDto.tags.length > 0) {
-  //     where.tags = { hasSome: searchDto.tags };
-  //   }
-  //   const notes = await this.prisma.note.findMany({ where });
+    const where: any = { userId };
+    if (searchDto.tags && searchDto.tags.length > 0) {
+      where.tags = { hasSome: searchDto.tags };
+    }
+    const notes = await this.prisma.note.findMany({ where });
 
-  //   // await this.redis.setex(cacheKey, 300, JSON.stringify(notes));
-  //   return notes;
-  // }
+    await this.redis.setex(cacheKey, 300, JSON.stringify(notes));
+    return notes;
+  }
 
-  // private async invalidateCacheForUser(userId: number): Promise<void> {
-  //   const keys = await this.redis.keys(`notes:search:${userId}:*`);
-  //   if (keys.length > 0) {
-  //     await this.redis.del(keys);
-  //   }
-  // }
+  private async invalidateCacheForUser(userId: number): Promise<void> {
+    const keys = await this.redis.keys(`notes:search:${userId}:*`);
+    if (keys.length > 0) {
+      await this.redis.del(keys);
+    }
+  }
 }
