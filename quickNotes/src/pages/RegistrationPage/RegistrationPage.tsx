@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import Input from "../../components/Input/Input";
 import Button from "../../components/Button/Button";
 import FormWrapper from "../../components/FormWrapper/FormWrapper";
+import axios from "axios";
 
 export default function RegistrationPage() {
   const navigate = useNavigate();
@@ -51,10 +52,28 @@ export default function RegistrationPage() {
     validatePassword(password, value);
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!emailError && !passwordError && email && password && passwordRepeat) {
-      console.log("Registering...", { email, password });
-      navigate("/login");
+      try {
+        const res = await axios.post(
+          "http://localhost:3000/api/v1/auth/register",
+          {
+            email,
+            password,
+          }
+        );
+
+        const token = res.data.token;
+        if (token) localStorage.setItem("token", token);
+
+        navigate("/dashboard");
+      } catch (err: any) {
+        if (err.response && err.response.data) {
+          alert(err.response.data.message || "Registration failed");
+        } else {
+          alert("Network or server error");
+        }
+      }
     }
   };
 
