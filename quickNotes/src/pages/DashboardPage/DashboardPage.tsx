@@ -1,6 +1,6 @@
-import { useState } from "react";
-
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 import NoteCard from "../../components/NoteCard/NoteCard";
 import Input from "../../components/Input/Input";
@@ -9,59 +9,71 @@ import DropDown from "../../components/DropDown/DropDown";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-
-  const [notes, setNotes] = useState([
-    {
-      id: 1,
-      title: "Shopping list",
-      content: "Buy milk, eggs, bread",
-      tags: ["shopping", "urgent"],
-      createdAt: "2025-10-01T10:00:00Z",
-      updatedAt: "2025-10-01T12:00:00Z",
-    },
-    {
-      id: 2,
-      title: "Morning routine",
-      content: "Wake up, exercise, breakfast",
-      tags: ["morning", "healthy"],
-      createdAt: "2025-10-01T07:00:00Z",
-      updatedAt: "2025-10-01T07:30:00Z",
-    },
-  ]);
-
+  const [notes, setNotes] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
   const [newTags, setNewTags] = useState("");
   const [filterTag, setFilterTag] = useState("");
 
-  const handleEdit = (id: number) => navigate(`/note/${id}`);
-  const handleDelete = (id: number) =>
-    setNotes(notes.filter((note) => note.id !== id));
+  const fetchNotes = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get("http://localhost:3000/api/v1/notes", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setNotes(res.data);
+    } catch (err) {
+      console.error("Failed to fetch notes:", err);
+    }
+  };
 
-  const handleAddNote = () => {
+  useEffect(() => {
+    fetchNotes();
+  }, []);
+
+  const handleEdit = (id: number) => navigate(`/note/${id}`);
+  const handleDelete = async (id: number) => {
+    try {
+      const token = localStorage.getItem("token");
+      await axios.delete(`http://localhost:3000/api/v1/notes/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setNotes(notes.filter((note) => note.id !== id));
+    } catch (err) {
+      console.error("Failed to delete note:", err);
+    }
+  };
+
+  const handleAddNote = async () => {
     if (!newTitle.trim() || !newContent.trim()) return;
 
+    const token = localStorage.getItem("token");
     const newNote = {
-      id: notes.length ? notes[notes.length - 1].id + 1 : 1,
       title: newTitle,
       content: newContent,
       tags: newTags.split(",").map((t) => t.trim().toLowerCase()),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
     };
 
-    setNotes([newNote, ...notes]);
-    setNewTitle("");
-    setNewContent("");
-    setNewTags("");
-    setIsModalOpen(false);
+    try {
+      const res = await axios.post(
+        "http://localhost:3000/api/v1/notes",
+        newNote,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setNotes([res.data, ...notes]);
+      setNewTitle("");
+      setNewContent("");
+      setNewTags("");
+      setIsModalOpen(false);
+    } catch (err) {
+      console.error("Failed to add note:", err);
+    }
   };
 
-  const allTags = Array.from(new Set(notes.flatMap((note) => note.tags)));
-
+  const allTags = Array.from(new Set(notes.flatMap((note) => note.tags || [])));
   const filteredNotes = filterTag
-    ? notes.filter((note) => note.tags.includes(filterTag))
+    ? notes.filter((note) => note.tags?.includes(filterTag))
     : notes;
 
   return (
@@ -87,7 +99,7 @@ export default function DashboardPage() {
           id={note.id}
           title={note.title}
           content={note.content}
-          tags={note.tags}
+          tags={note.tags || []}
           createdAt={note.createdAt}
           updatedAt={note.updatedAt}
           onEdit={handleEdit}
@@ -99,7 +111,6 @@ export default function DashboardPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-gray-800 p-6 rounded-xl w-6/12 flex flex-col gap-4 relative">
             <h2 className="text-white text-xl font-semibold">Add New Note</h2>
-
             <Input
               placeholder="Title"
               value={newTitle}
@@ -121,7 +132,6 @@ export default function DashboardPage() {
               type="text"
               id="newTags"
             />
-
             <div className="flex gap-2">
               <Button handleClick={handleAddNote}>Save</Button>
               <Button
